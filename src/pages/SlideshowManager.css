@@ -1,0 +1,155 @@
+.slideshow-manager-container {
+  max-width: 500px;
+  margin: 32px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(44,62,80,0.10);
+  padding: 18px 8px 32px 8px;
+  text-align: left;
+}
+.slideshow-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #2d3e50;
+  margin-bottom: 18px;
+  text-align: center;
+}
+.slideshow-upload-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+.slideshow-upload-form input[type="file"] {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  background: #fafafa;
+  font-size: 15px;
+}
+.slideshow-upload-form button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  background: #e3e7ff;
+  color: #34495e;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.slideshow-upload-form button:disabled {
+  background: #eee;
+  color: #aaa;
+  cursor: not-allowed;
+}
+.upload-progress-bar {
+  width: 100%;
+  background: #f5f5f5;
+  border-radius: 8px;
+  height: 18px;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.upload-progress {
+  background: #4caf50;
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.3s;
+}
+.upload-progress-label {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  line-height: 18px;
+}
+.success {
+  color: #27ae60;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.error {
+  color: #c0392b;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.slideshow-images-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+  justify-content: center;
+}
+.slideshow-image-card {
+  position: relative;
+  width: 120px;
+  height: 80px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slideshow-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.delete-image-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #fff;
+  color: #c0392b;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+  transition: background 0.2s;
+}
+.delete-image-btn:hover {
+  background: #ffe0e0;
+}
+.no-images {
+  color: #888;
+  font-size: 15px;
+  text-align: center;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .slideshow-manager-container {
+    max-width: 100vw;
+    padding: 8px 2px 18px 2px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .slideshow-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  .slideshow-image-card {
+    width: 90px;
+    height: 60px;
+    border-radius: 8px;
+  }
+  .slideshow-images-list {
+    gap: 10px;
+  }
+  .upload-progress-label {
+    font-size: 12px;
+  }
+}

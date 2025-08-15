@@ -1,0 +1,36 @@
+.top-navbar {
+  width: 100%;
+  background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.top-navbar__brand {
+  font-size: 1.3rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.top-navbar__logout {
+  background: var(--white);
+  color: var(--primary-color);
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.top-navbar__logout:hover {
+  background: var(--primary-light);
+  color: var(--white);
+}
