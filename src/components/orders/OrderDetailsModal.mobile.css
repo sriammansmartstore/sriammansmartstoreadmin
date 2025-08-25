@@ -1,0 +1,53 @@
+:root {}
+
+/* Strong clamp for item thumbnails regardless of source size */
+.order-details-modal-mobile .order-items-list .item-thumb,
+.order-details-modal .order-items-list .item-thumb {
+  width: 32px !important;
+  height: 32px !important;
+  box-sizing: content-box;
+}
+
+@media (min-width: 768px) {
+  .order-details-modal-mobile .order-items-list .item-thumb,
+  .order-details-modal .order-items-list .item-thumb {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
+/* Prevent global img styles from stretching product images */
+.order-items-list img {
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+}
+
+/* Only inside the thumbnail, force containment */
+.order-items-list .item-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block;
+}
+
+/* Tighten spacing for rows on small screens */
+.order-items-list .item-row {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.order-items-list .item-row-inner {
+  gap: 6px;
+}
+
+/* Text clamping helpers */
+.order-items-list .item-meta .font-medium {
+  font-size: 0.9rem;
+  line-height: 1.1rem;
+}
+
+.order-items-list .item-meta .text-xs {
+  font-size: 0.75rem;
+}

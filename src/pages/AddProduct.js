@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../firebase';
-import { collection, addDoc, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, addDoc, getDocs, orderBy, query, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { reserveLocation, annotateLocation } from '../utils/locations';
 import ProductForm from '../components/ProductForm';
 import TopNavBar from '../components/TopNavBar';
 import BackButton from '../components/BackButton';
@@ -25,7 +26,7 @@ function AddProduct() {
     return 1;
   };
 
-  const handleAddProduct = async ({ name, nameTamil, keywords, options, description, category, images }) => {
+  const handleAddProduct = async ({ name, nameTamil, keywords, options, description, category, images, rack, shelf, bin, locationCode, showOfferBand }) => {
     setUploading(true);
     setError('');
     setSuccess('');
@@ -54,6 +55,11 @@ function AddProduct() {
         specialPrice: opt.specialPrice ? parseFloat(opt.specialPrice) : null
       }));
 
+      // If a location is provided, reserve it atomically before creating product
+      if (locationCode && rack && shelf && bin) {
+        await reserveLocation(locationCode, { category, tentativeName: name });
+      }
+
       // Product data object
       const productData = {
         productNumber,
@@ -64,11 +70,30 @@ function AddProduct() {
         description,
         category,
         imageUrls,
-        createdAt: new Date()
+        showOfferBand: Boolean(showOfferBand),
+        createdAt: new Date(),
+        ...(locationCode && rack && shelf && bin ? {
+          location: {
+            code: locationCode,
+            rack: Number(rack),
+            shelf: Number(shelf),
+            bin: Number(bin)
+          }
+        } : {})
       };
 
       // Add to 'products/{category}/items' subcollection
-      await addDoc(collection(db, 'products', category, 'items'), productData);
+      const newRef = await addDoc(collection(db, 'products', category, 'items'), productData);
+
+      // Annotate location with product id reference for easier lookup
+      if (locationCode && rack && shelf && bin) {
+        await annotateLocation(locationCode, {
+          productId: newRef.id,
+          productDocPath: `products/${category}/items/${newRef.id}`,
+          category,
+          productNumber
+        });
+      }
 
       setSuccess('Product added successfully!');
       setTimeout(() => navigate('/products'), 1200);
