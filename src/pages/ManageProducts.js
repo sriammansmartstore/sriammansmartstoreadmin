@@ -248,23 +248,12 @@ function ManageProducts() {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            console.log('Fetching categories from Firestore...');
-            
-            // First, get all categories (documents in the 'products' collection)
-            const categoriesSnapshot = await getDocs(collection(db, 'products'));
-            console.log(`Found ${categoriesSnapshot.size} categories`);
-            
+            console.log('Starting to fetch products...');
             let productsList = [];
-            
-            if (categoriesSnapshot.empty) {
-                console.log('No categories found in the products collection');
-                setProducts([]);
-                setFilteredProducts([]);
-                return;
-            }
             
             // Define the categories we're interested in
             const targetCategories = ['sweets', 'Chips']; // Add other categories as needed
+            console.log('Target categories:', targetCategories);
             
             // Fetch products from each category's 'items' subcollection
             for (const category of targetCategories) {
@@ -547,27 +536,33 @@ function ManageProducts() {
                     <div
                         style={{
                             display: 'flex',
+                            flexDirection: isClient && window.innerWidth <= 768 ? 'column' : 'row',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
+                            alignItems: isClient && window.innerWidth <= 768 ? 'stretch' : 'center',
                             gap: '16px',
                             marginBottom: '24px',
                         }}
                     >
-                        <h1 style={{ margin: 0 }}>Manage Products</h1>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <h1 style={{ margin: 0, textAlign: isClient && window.innerWidth <= 768 ? 'center' : 'left' }}>Manage Products</h1>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: isClient && window.innerWidth <= 768 ? 'column' : 'row',
+                            gap: '12px',
+                            width: isClient && window.innerWidth <= 768 ? '100%' : 'auto'
+                        }}>
                             <Input.Search
                                 placeholder="Search products..."
                                 allowClear
                                 onSearch={handleSearch}
-                                style={{ width: 250 }}
+                                style={{ width: isClient && window.innerWidth <= 768 ? '100%' : 250 }}
                             />
                             <Button 
                                 type="primary" 
                                 icon={<PlusOutlined />}
                                 onClick={() => navigate('/add-product')}
+                                style={isClient && window.innerWidth <= 768 ? { width: '100%' } : {}}
                             >
-                                Add Product
+                                {isClient && window.innerWidth > 480 ? 'Add Product' : 'Add'}
                             </Button>
                         </div>
                     </div>
