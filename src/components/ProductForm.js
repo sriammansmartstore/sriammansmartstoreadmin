@@ -199,43 +199,64 @@ function ProductForm({
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    console.log('Submit clicked. isFormComplete:', isFormComplete, 'uploading:', uploading);
-    
     if (!isFormComplete) {
-      console.log('Form not complete. Validation state:', checkFormCompletion());
       if (typeof onError === 'function') {
         onError('Please complete all sections of the form before submitting');
       }
       return;
     }
 
-    onSubmit({
+    // Prepare product data with all fields
+    const productData = {
+      // Basic Information
       name,
-      // Tax and GST Data
-      gstInclusive,
-      gstType,
-      taxType,
-      showGstFields,
-      hsnCode,
-      sacCode,
-      gstRate,
-      igst,
-      sgst,
-      cgst,
-      cess,
-      taxCategory,
-      nameTamil,
-      keywords,
-      options,
-      description,
-      category,
-      images,
+      nameTamil: nameTamil || '',
+      description: description || '',
+      category: category || '',
+      keywords: keywords || [],
+      images: images || [],
+      
+      // Stock and Location
+      options: options.map(opt => ({
+        unit: opt.unit || '',
+        price: Number(opt.price) || 0,
+        quantity: Number(opt.quantity) || 0,
+        minStock: Number(opt.minStock) || 0,
+        // Include any other option fields
+        ...opt
+      })),
       rack: rack ? Number(rack) : null,
       shelf: shelf ? Number(shelf) : null,
       bin: bin ? Number(bin) : null,
       locationCode: rack && shelf && bin ? makeCode(Number(rack), Number(shelf), Number(bin)) : '',
-      showOfferBand
-    });
+      
+      // Tax and GST Information
+      gstInclusive: Boolean(gstInclusive),
+      gstType: gstType || 'regular',
+      taxType: taxType || 'inclusive',
+      showGstFields: Boolean(showGstFields),
+      hsnCode: hsnCode || '',
+      sacCode: sacCode || '',
+      gstRate: Number(gstRate) || 0,
+      igst: Number(igst) || 0,
+      sgst: Number(sgst) || 0,
+      cgst: Number(cgst) || 0,
+      cess: Number(cess) || 0,
+      taxCategory: taxCategory || '',
+      
+      // UI and Display
+      showOfferBand: Boolean(showOfferBand),
+      
+      // Timestamps
+      createdAt: isEdit ? initialData.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      
+      // Include any existing ID if editing
+      ...(isEdit && initialData.id && { id: initialData.id })
+    };
+
+    console.log('Submitting product data:', productData);
+    onSubmit(productData);
   };
 
   // Section navigation for mobile
@@ -324,7 +345,7 @@ function ProductForm({
   // Render pricing section
   const renderPricingSection = () => (
     <div className="form-section">
-      <h3>Pricing & Tax Information</h3>
+      <h3>Pricing & Options</h3>
       
       <div className="toggle-container">
         <label>Show Offer Band:</label>
@@ -342,69 +363,92 @@ function ProductForm({
 
       <label>Product Options</label>
       {options.map((opt, idx) => (
-        <div key={idx} className="option-row">
-          <div className="option-grid">
-            <div className="option-field">
-              <label>Unit</label>
-              <select value={opt.unit} onChange={e => handleOptionChange(idx, 'unit', e.target.value)} required>
-                {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-            
-            <div className="option-field">
-              <label>{`Unit Size (${opt.unit})`}</label>
+        <div key={idx} className="option-row" style={{ marginBottom: '24px', border: '1px solid #eee', padding: '16px', borderRadius: '8px' }}>
+          {/* Unit and Unit Size in one row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label>Unit (e.g., kg, piece, liter)</label>
               <input
                 type="text"
-                placeholder={`Enter unit size in ${opt.unit}`}
-                value={opt.unitSize}
-                onChange={e => handleOptionChange(idx, 'unitSize', e.target.value)}
+                placeholder="Unit"
+                value={opt.unit || ''}
+                onChange={e => handleOptionChange(idx, 'unit', e.target.value)}
                 required
+                style={{ width: '100%' }}
               />
             </div>
-            
-            <div className="option-field">
-              <label>MRP Price</label>
+            <div>
+              <label>Unit Size (e.g., 1kg, 500ml)</label>
+              <input
+                type="text"
+                placeholder="Unit Size"
+                value={opt.unitSize || ''}
+                onChange={e => handleOptionChange(idx, 'unitSize', e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+          
+          {/* Prices in one row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label>MRP (₹)</label>
               <input
                 type="number"
-                placeholder="MRP Price"
-                value={opt.mrp}
-                onChange={e => handleOptionChange(idx, 'mrp', e.target.value)}
+                placeholder="MRP"
                 min="0"
                 step="0.01"
-                required
+                value={opt.mrp || ''}
+                onChange={e => handleOptionChange(idx, 'mrp', e.target.value)}
+                style={{ width: '100%' }}
               />
             </div>
-            
-            <div className="option-field">
-              <label>Selling Price</label>
+            <div>
+              <label>Selling Price (₹)</label>
               <input
                 type="number"
                 placeholder="Selling Price"
-                value={opt.sellingPrice}
-                onChange={e => handleOptionChange(idx, 'sellingPrice', e.target.value)}
                 min="0"
                 step="0.01"
+                value={opt.sellingPrice || ''}
+                onChange={e => handleOptionChange(idx, 'sellingPrice', e.target.value)}
                 required
+                style={{ width: '100%' }}
               />
             </div>
-            
-            <div className="option-field">
-              <label>Special Price</label>
+            <div>
+              <label>Special Price (₹)</label>
               <input
                 type="number"
-                placeholder="Special Price (optional)"
-                value={opt.specialPrice}
-                onChange={e => handleOptionChange(idx, 'specialPrice', e.target.value)}
+                placeholder="Special Price"
                 min="0"
                 step="0.01"
+                value={opt.specialPrice || ''}
+                onChange={e => handleOptionChange(idx, 'specialPrice', e.target.value)}
+                style={{ width: '100%' }}
               />
             </div>
-            
-            <div className="option-actions">
-              {options.length > 1 && (
-                <button type="button" onClick={() => handleRemoveOption(idx)} className="remove-btn">Remove</button>
-              )}
-            </div>
+          </div>
+          
+          {/* Remove button */}
+          <div style={{ textAlign: 'right' }}>
+            {options.length > 1 && (
+              <button 
+                type="button" 
+                onClick={() => handleRemoveOption(idx)} 
+                className="remove-btn"
+                style={{
+                  background: '#ffebee',
+                  color: '#c62828',
+                  border: '1px solid #ffcdd2',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Remove Option
+              </button>
+            )}
           </div>
         </div>
       ))}
@@ -541,45 +585,21 @@ function ProductForm({
   const renderFormActions = () => (
     <div className="form-actions" style={{ marginTop: activeSection === 'stock' ? '24px' : '0' }}>
       {activeSection === 'stock' && (
-        <div>
+        <div style={{ width: '100%' }}>
           <button 
             className={`submit-btn ${!isFormComplete ? 'submit-btn--disabled' : ''}`} 
             type="button"
             onClick={handleSubmit}
             disabled={uploading || !isFormComplete}
-            title={!isFormComplete ? 'Complete all form sections to enable' : ''}
+            style={{
+              width: '100%',
+              padding: '12px',
+              fontSize: '16px',
+              marginTop: '16px'
+            }}
           >
             {uploading ? 'Processing...' : isEdit ? 'Update Product' : 'Add Product'}
           </button>
-          
-          {/* Debug button */}
-          <button 
-            type="button" 
-            onClick={() => {
-              console.log('Manual form check:', {
-                isFormComplete,
-                checkFormCompletion: checkFormCompletion(),
-                formValues: { name, category, description, images, options, rack, shelf, bin }
-              });
-            }}
-            style={{
-              fontSize: '12px',
-              color: '#666',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              marginTop: '8px',
-              textDecoration: 'underline'
-            }}
-          >
-            Why is the button disabled?
-          </button>
-          
-          {!isFormComplete && (
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-              Complete all form sections to enable
-            </div>
-          )}
         </div>
       )}
       
