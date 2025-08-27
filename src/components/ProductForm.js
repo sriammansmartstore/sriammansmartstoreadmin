@@ -45,19 +45,9 @@ function ProductForm({
   isEdit = false
 }) {
   const [name, setName] = useState(initialData.name || '');
-  // Tax and GST State
-  const [gstInclusive, setGstInclusive] = useState(initialData.gstInclusive || true);
-  const [gstType, setGstType] = useState(initialData.gstType || 'regular');
-  const [taxType, setTaxType] = useState(initialData.taxType || 'inclusive');
-  const [showGstFields, setShowGstFields] = useState(initialData.showGstFields !== false);
-  const [hsnCode, setHsnCode] = useState(initialData.hsnCode || '');
-  const [sacCode, setSacCode] = useState(initialData.sacCode || '');
-  const [gstRate, setGstRate] = useState(initialData.gstRate || 18);
-  const [igst, setIgst] = useState(initialData.igst || 0);
-  const [sgst, setSgst] = useState(initialData.sgst || 0);
-  const [cgst, setCgst] = useState(initialData.cgst || 0);
-  const [cess, setCess] = useState(initialData.cess || 0);
-  const [taxCategory, setTaxCategory] = useState(initialData.taxCategory || 'standard');
+  // Tax and GST State - Simplified to only include essential fields
+  const [gstInclusive, setGstInclusive] = useState(initialData.gstInclusive !== undefined ? initialData.gstInclusive : true);
+  const [gstRate, setGstRate] = useState(initialData.gstRate || 0);
   const [nameTamil, setNameTamil] = useState(initialData.nameTamil || '');
   const [keywords, setKeywords] = useState(initialData.keywords || '');
   // Options: array of { unit, unitSize, quantity, mrp, sellingPrice, specialPrice }
@@ -206,6 +196,27 @@ function ProductForm({
       return;
     }
 
+    // Generate location details
+    const locationData = {
+      bin: bin ? Number(bin) : null,
+      rack: rack ? Number(rack) : null,
+      shelf: shelf ? Number(shelf) : null,
+      code: rack && shelf && bin ? makeCode(Number(rack), Number(shelf), Number(bin)) : ''
+    };
+
+    // Prepare options with all required fields
+    const preparedOptions = options.map(option => ({
+      unit: option.unit || '',
+      unitSize: option.unitSize || '',
+      mrp: Number(option.mrp) || 0,
+      quantity: Number(option.quantity) || 0,
+      sellingPrice: Number(option.sellingPrice) || 0,
+      specialPrice: Number(option.specialPrice) || 0,
+      minStock: Number(option.minStock) || 0,
+      // Include any additional option fields
+      ...option
+    }));
+
     // Prepare product data with all fields
     const productData = {
       // Basic Information
@@ -213,49 +224,33 @@ function ProductForm({
       nameTamil: nameTamil || '',
       description: description || '',
       category: category || '',
-      keywords: keywords || [],
-      images: images || [],
+      keywords: keywords ? keywords.split(',').map(k => k.trim()) : [],
+      imageUrls: images.map(img => typeof img === 'string' ? img : URL.createObjectURL(img)),
       
-      // Stock and Location
-      options: options.map(opt => ({
-        unit: opt.unit || '',
-        price: Number(opt.price) || 0,
-        quantity: Number(opt.quantity) || 0,
-        minStock: Number(opt.minStock) || 0,
-        // Include any other option fields
-        ...opt
-      })),
-      rack: rack ? Number(rack) : null,
-      shelf: shelf ? Number(shelf) : null,
-      bin: bin ? Number(bin) : null,
-      locationCode: rack && shelf && bin ? makeCode(Number(rack), Number(shelf), Number(bin)) : '',
+      // Location Information
+      location: locationData,
       
-      // Tax and GST Information
+      // Product Options
+      options: preparedOptions,
+      
+      // Tax Information
       gstInclusive: Boolean(gstInclusive),
-      gstType: gstType || 'regular',
-      taxType: taxType || 'inclusive',
-      showGstFields: Boolean(showGstFields),
-      hsnCode: hsnCode || '',
-      sacCode: sacCode || '',
       gstRate: Number(gstRate) || 0,
-      igst: Number(igst) || 0,
-      sgst: Number(sgst) || 0,
-      cgst: Number(cgst) || 0,
-      cess: Number(cess) || 0,
-      taxCategory: taxCategory || '',
       
       // UI and Display
       showOfferBand: Boolean(showOfferBand),
       
       // Timestamps
-      createdAt: isEdit ? initialData.createdAt : new Date().toISOString(),
+      createdAt: isEdit && initialData.createdAt ? initialData.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      
+      // Additional Fields
+      productNumber: isEdit && initialData.productNumber ? initialData.productNumber : Math.floor(1000 + Math.random() * 9000),
       
       // Include any existing ID if editing
       ...(isEdit && initialData.id && { id: initialData.id })
     };
 
-    console.log('Submitting product data:', productData);
     onSubmit(productData);
   };
 

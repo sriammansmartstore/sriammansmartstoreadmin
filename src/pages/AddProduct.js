@@ -26,11 +26,25 @@ function AddProduct() {
     return 1;
   };
 
-  const handleAddProduct = async ({ name, nameTamil, keywords, options, description, category, images, rack, shelf, bin, locationCode, showOfferBand }) => {
+  const handleAddProduct = async (productData) => {
     setUploading(true);
     setError('');
     setSuccess('');
     try {
+      const {
+        name,
+        nameTamil,
+        description,
+        category,
+        keywords,
+        images,
+        options,
+        location,
+        showOfferBand,
+        gstInclusive,
+        gstRate
+      } = productData;
+
       // Generate next product number for this category
       const productNumber = await getNextProductNumber(category);
 
@@ -38,40 +52,53 @@ function AddProduct() {
       let imageUrls = [];
       if (images && images.length > 0) {
         for (let img of images) {
-          const imageRef = ref(storage, `products/${category}/${Date.now()}_${img.name}`);
-          await uploadBytes(imageRef, img);
-          const url = await getDownloadURL(imageRef);
-          imageUrls.push(url);
+          // Only upload if it's a new file (not already a URL)
+          if (typeof img !== 'string') {
+            const imageRef = ref(storage, `products/${category}/${Date.now()}_${img.name}`);
+            await uploadBytes(imageRef, img);
+            const url = await getDownloadURL(imageRef);
+            imageUrls.push(url);
+          } else {
+            // Keep existing URLs
+            imageUrls.push(img);
+          }
         }
       }
 
-      // Prepare options array: parse numbers
+      // Prepare options array with all fields
       const parsedOptions = (options || []).map(opt => ({
-        unit: opt.unit,
-        unitSize: opt.unitSize,
-        quantity: opt.quantity ? parseFloat(opt.quantity) : 0,
-        mrp: opt.mrp ? parseFloat(opt.mrp) : 0,
-        sellingPrice: opt.sellingPrice ? parseFloat(opt.sellingPrice) : 0,
-        specialPrice: opt.specialPrice ? parseFloat(opt.specialPrice) : null
+        unit: opt.unit || '',
+        unitSize: opt.unitSize || '',
+        quantity: opt.quantity ? Number(opt.quantity) : 0,
+        mrp: opt.mrp ? Number(opt.mrp) : 0,
+        sellingPrice: opt.sellingPrice ? Number(opt.sellingPrice) : 0,
+        specialPrice: opt.specialPrice ? Number(opt.specialPrice) : 0,
+        minStock: opt.minStock ? Number(opt.minStock) : 0
       }));
+
+      // Extract location data
+      const { rack, shelf, bin, code: locationCode } = location || {};
 
       // If a location is provided, reserve it atomically before creating product
       if (locationCode && rack && shelf && bin) {
         await reserveLocation(locationCode, { category, tentativeName: name });
       }
 
-      // Product data object
-      const productData = {
+      // Prepare product data for Firestore
+      const productDoc = {
         productNumber,
         name,
-        nameTamil,
-        keywords,
-        options: parsedOptions,
-        description,
+        nameTamil: nameTamil || '',
+        description: description || '',
         category,
+        keywords: Array.isArray(keywords) ? keywords : (keywords ? [keywords] : []),
         imageUrls,
+        options: parsedOptions,
         showOfferBand: Boolean(showOfferBand),
-        createdAt: new Date(),
+        gstInclusive: Boolean(gstInclusive),
+        gstRate: Number(gstRate) || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         ...(locationCode && rack && shelf && bin ? {
           location: {
             code: locationCode,
@@ -83,7 +110,7 @@ function AddProduct() {
       };
 
       // Add to 'products/{category}/items' subcollection
-      const newRef = await addDoc(collection(db, 'products', category, 'items'), productData);
+      const newRef = await addDoc(collection(db, 'products', category, 'items'), productDoc);
 
       // Annotate location with product id reference for easier lookup
       if (locationCode && rack && shelf && bin) {
