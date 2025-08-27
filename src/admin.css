@@ -48,8 +48,12 @@ body {
 
 .admin-main {
   flex: 1;
-  padding: 40px 48px;
+  padding: 0;
   background: #f4f6fa;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .admin-header {
@@ -110,6 +114,6 @@ label {
     justify-content: space-around;
   }
   .admin-main {
-    padding: 24px 8px;
+    padding: 0;
   }
 }

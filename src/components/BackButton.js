@@ -1,13 +1,29 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import './BackButton.css';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 
-function BackButton({ to = -1, label = 'Back' }) {
+function BackButton({ to = -1, label = 'Back', style = {}, className = '' }) {
   const navigate = useNavigate();
+  
   return (
-    <button className="back-btn" onClick={() => navigate(to)}>
-      <span className="back-arrow">&#8592;</span> {label}
-    </button>
+    <Button 
+      type="text"
+      icon={<ArrowLeftOutlined />}
+      onClick={() => navigate(to)}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '4px 12px',
+        margin: '8px 0 16px',
+        color: '#1890ff',
+        fontWeight: 500,
+        ...style
+      }}
+      className={`back-button ${className}`}
+    >
+      {label}
+    </Button>
   );
 }
 

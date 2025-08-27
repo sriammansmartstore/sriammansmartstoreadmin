@@ -105,11 +105,15 @@ function AddProduct() {
   };
 
   return (
-    <>
+    <div style={{ background: '#f0f2f5', minHeight: '100vh' }}>
       <TopNavBar />
-      <div className="admin-main">
-        <BackButton />
-        <div className="add-product-page-container" style={{ maxWidth: 500, margin: '40px auto', background: '#fff', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.08)', padding: 32 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 16px 32px' }}>
+        <div style={{ background: '#fff', borderRadius: 8, padding: 24, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }}>
+          <BackButton 
+            label="Back" 
+            style={{ marginBottom: 24, paddingLeft: 0 }}
+          />
+         
           <ProductForm
             onSubmit={handleAddProduct}
             uploading={uploading}
@@ -120,7 +124,7 @@ function AddProduct() {
           />
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
