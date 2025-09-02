@@ -251,9 +251,20 @@ function ManageProducts() {
             console.log('Starting to fetch products...');
             let productsList = [];
             
-            // Define the categories we're interested in
-            const targetCategories = ['sweets', 'Chips']; // Add other categories as needed
-            console.log('Target categories:', targetCategories);
+            // First, get all categories from the 'categories' collection
+            const categoriesSnapshot = await getDocs(collection(db, 'categories'));
+            const targetCategories = categoriesSnapshot.docs.map(doc => doc.data().name);
+            
+            if (targetCategories.length === 0) {
+                console.log('No categories found in categories collection');
+                setProducts([]);
+                setFilteredProducts([]);
+                return;
+            }
+            
+            console.log('Found categories:', targetCategories);
+            
+            console.log('Found categories:', targetCategories);
             
             // Fetch products from each category's 'items' subcollection
             for (const category of targetCategories) {
@@ -559,7 +570,7 @@ function ManageProducts() {
                             <Button 
                                 type="primary" 
                                 icon={<PlusOutlined />}
-                                onClick={() => navigate('/add-product')}
+                                onClick={() => navigate('/products/add')}
                                 style={isClient && window.innerWidth <= 768 ? { width: '100%' } : {}}
                             >
                                 {isClient && window.innerWidth > 480 ? 'Add Product' : 'Add'}

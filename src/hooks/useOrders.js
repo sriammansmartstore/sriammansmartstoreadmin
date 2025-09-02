@@ -198,6 +198,7 @@ export const useOrders = (status, itemsPerPage = 10) => {
 export const useOrderCounts = () => {
   const [counts, setCounts] = useState({
     pending: 0,
+    processing: 0,
     shipped: 0,
     'in-transit': 0,
     delivered: 0,
@@ -214,7 +215,7 @@ export const useOrderCounts = () => {
         setLoading(true);
         setError(null);
 
-        const statuses = ['pending', 'shipped', 'in-transit', 'delivered', 'cancelled', 'returned'];
+        const statuses = ['pending', 'processing', 'shipped', 'in-transit', 'delivered', 'cancelled', 'returned'];
         const countsObj = { all: 0 };
         
         // Fetch count for each status using 'in' variants

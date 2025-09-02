@@ -13,7 +13,8 @@ import AddCategory from './pages/AddCategory';
 import ManageProducts from './pages/ManageProducts';
 import ManageCategories from './pages/ManageCategories';
 import SlideshowManager from './pages/SlideshowManager';
-import OrdersDashboard from './pages/orders/OrdersDashboard';
+import OrdersDashboard from './pages/orders/OrdersDashboard.js';
+import OfferMessages from './pages/OfferMessages';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -45,8 +46,10 @@ function App() {
           <Route path="/categories/add" element={<PrivateRoute><AddCategory /></PrivateRoute>} />
           <Route path="/register-admin" element={<RegisterAdmin />} />
           <Route path="/products/manage" element={<PrivateRoute><ManageProducts /></PrivateRoute>} />
+          <Route path="/edit-product/:category/:id" element={<PrivateRoute><AddProduct editMode={true} /></PrivateRoute>} />
           <Route path="/categories/manage" element={<PrivateRoute><ManageCategories /></PrivateRoute>} />
           <Route path="/slideshow" element={<PrivateRoute><SlideshowManager /></PrivateRoute>} />
+          <Route path="/offers" element={<PrivateRoute><OfferMessages /></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

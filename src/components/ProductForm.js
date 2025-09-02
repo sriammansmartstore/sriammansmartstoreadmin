@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db, storage } from '../firebase';
+import { collection, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { suggestNextLocation, makeCode } from '../utils/locations';
 
 // Tax and GST related constants
@@ -36,7 +37,7 @@ const unitOptions = [
 
 function ProductForm({
   onSubmit,
-  initialData = {},
+  initialData = null,
   uploading = false,
   success = '',
   error = '',
@@ -44,41 +45,122 @@ function ProductForm({
   onError = () => {},
   isEdit = false
 }) {
-  const [name, setName] = useState(initialData.name || '');
-  // Tax and GST State - Simplified to only include essential fields
-  const [gstInclusive, setGstInclusive] = useState(initialData.gstInclusive !== undefined ? initialData.gstInclusive : true);
-  const [gstRate, setGstRate] = useState(initialData.gstRate || 0);
-  const [nameTamil, setNameTamil] = useState(initialData.nameTamil || '');
-  const [keywords, setKeywords] = useState(initialData.keywords || '');
-  // Options: array of { unit, unitSize, quantity, mrp, sellingPrice, specialPrice }
-  const [options, setOptions] = useState(
-    initialData.options && Array.isArray(initialData.options) && initialData.options.length > 0
-      ? initialData.options
-      : [
-          {
-            unit: unitOptions[0],
-            unitSize: '',
-            quantity: '',
-            mrp: '',
-            sellingPrice: '',
-            specialPrice: ''
-          }
-        ]
-  );
-  const [description, setDescription] = useState(initialData.description || '');
-  const [category, setCategory] = useState(initialData.category || '');
+  // Use empty object if initialData is null
+  const data = initialData || {};
+  
+  // All state hooks must be called unconditionally at the top level
+  const [name, setName] = useState('');
+  const [gstInclusive, setGstInclusive] = useState(true);
+  const [gstRate, setGstRate] = useState(0);
+  const [taxType, setTaxType] = useState('inclusive');
+  const [gstType, setGstType] = useState('regular');
+  const [nameTamil, setNameTamil] = useState('');
+  const [keywords, setKeywords] = useState('');
+  const [options, setOptions] = useState([{
+    unit: unitOptions[0],
+    unitSize: '',
+    quantity: 0,
+    mrp: 0,
+    sellingPrice: 0,
+    specialPrice: 0,
+    minStock: 0
+  }]);
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [images, setImages] = useState([]);
-  const [rack, setRack] = useState(initialData.rack || '');
-  const [shelf, setShelf] = useState(initialData.shelf || '');
-  const [bin, setBin] = useState(initialData.bin || '');
+  const [rack, setRack] = useState('');
+  const [shelf, setShelf] = useState('');
+  const [bin, setBin] = useState('');
   const [locationHint, setLocationHint] = useState('');
   const [locationError, setLocationError] = useState('');
-  const [showOfferBand, setShowOfferBand] = useState(initialData.showOfferBand || false);
   const [activeSection, setActiveSection] = useState('product');
   const [isFormComplete, setIsFormComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  // Inline Add Category modal state
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatDescription, setNewCatDescription] = useState('');
+  const [newCatImage, setNewCatImage] = useState(null);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [addCategoryError, setAddCategoryError] = useState('');
+  const [addCategorySuccess, setAddCategorySuccess] = useState('');
 
-  // Fetch categories from Firestore
+  // Toggle tax inclusive callback - moved to top level
+  const toggleTaxInclusive = useCallback(() => {
+    setGstInclusive(prev => {
+      const newValue = !prev;
+      setTaxType(newValue ? 'inclusive' : 'exclusive');
+      return newValue;
+    });
+  }, []);
+
+  // Check if all required fields are filled - moved to top level
+  const checkFormCompletion = useCallback(() => {
+    try {
+      const isProductDetailsComplete = name && category && description;
+      const isPricingComplete = options.length > 0 && options.every(opt => 
+        opt.unit && (Number(opt.sellingPrice) > 0 || Number(opt.mrp) > 0) && 
+        typeof opt.quantity === 'number' && opt.quantity >= 0
+      );
+      const isLocationComplete = Boolean(rack && shelf && bin);
+      
+      // For edit mode, be more lenient with validation
+      if (isEdit) {
+        return isProductDetailsComplete && isPricingComplete;
+      }
+      
+      return isProductDetailsComplete && isPricingComplete && isLocationComplete;
+    } catch (err) {
+      console.error('Error checking form completion:', err);
+      return true; // Allow submission in case of validation errors
+    }
+  }, [name, category, description, images, options, rack, shelf, bin, onError, isEdit]);
+  
+  // Initialize form with data when initialData changes or in edit mode
+  useEffect(() => {
+    if (isEdit && !initialData) {
+      setIsLoading(true);
+      // Load product data here if needed
+      setIsLoading(false);
+    } else if (initialData) {
+      setName(initialData.name || '');
+      setGstInclusive(initialData.gstInclusive !== undefined ? initialData.gstInclusive : true);
+      setGstRate(initialData.gstRate || 0);
+      setTaxType(initialData.taxType || 'inclusive');
+      setGstType(initialData.gstType || 'regular');
+      setNameTamil(initialData.nameTamil || '');
+      setKeywords(Array.isArray(initialData.keywords) ? initialData.keywords.join(', ') : '');
+      setOptions(
+        initialData.options && Array.isArray(initialData.options) && initialData.options.length > 0
+          ? initialData.options.map(opt => ({
+              ...opt,
+              quantity: Number(opt.quantity) || 0,
+              minStock: Number(opt.minStock) || 0,
+              mrp: Number(opt.mrp) || 0,
+              sellingPrice: Number(opt.sellingPrice) || 0,
+              specialPrice: Number(opt.specialPrice) || 0
+            }))
+          : [{
+              unit: unitOptions[0],
+              unitSize: '',
+              quantity: 0,
+              mrp: 0,
+              sellingPrice: 0,
+              specialPrice: 0,
+              minStock: 0
+            }]
+      );
+      setDescription(initialData.description || '');
+      setCategory(initialData.category || '');
+      setImages(initialData.imageUrls ? [...initialData.imageUrls] : []);
+      setRack(initialData.location?.rack || '');
+      setShelf(initialData.location?.shelf || '');
+      setBin(initialData.location?.bin || '');
+    }
+  }, [initialData, isEdit]);
+  
+  // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -90,29 +172,131 @@ function ProductForm({
         });
         setCategoryOptions(categories);
       } catch (err) {
-        setCategoryOptions([]);
+        console.error('Error fetching categories:', err);
+        onError('Failed to load categories');
       }
     };
+    
     fetchCategories();
-  }, []);
+  }, [onError]);
+  
+  // Handle loading state with useEffect
+  useEffect(() => {
+    if (isEdit && !initialData) {
+      const loadData = async () => {
+        try {
+          // Simulate loading or fetch data here if needed
+          // Once data is loaded, update the state
+          setIsLoading(false);
+        } catch (err) {
+          onError(err);
+          setIsLoading(false);
+        }
+      };
+      loadData();
+    }
+  }, [isEdit, initialData, onError]);
 
+  // Update form completion status when dependencies change
+  useEffect(() => {
+    setIsFormComplete(checkFormCompletion());
+  }, [checkFormCompletion]);
+
+  // Return loading state if in edit mode and still loading
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 0' }}>
+        <div className="ant-spin ant-spin-lg" />
+        <div style={{ marginTop: 16 }}>Loading product data...</div>
+      </div>
+    );
+  }
+  
   const handleImageChange = (e) => {
     setImages(Array.from(e.target.files));
   };
 
+  const handleCategoryChange = (e) => {
+    const val = e.target.value;
+    if (val === '__add__') {
+      setShowCategoryModal(true);
+      return;
+    }
+    setCategory(val);
+  };
+
+  const handleNewCatImageChange = (e) => {
+    setNewCatImage(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+  };
+
+  const resetNewCategoryForm = () => {
+    setNewCatName('');
+    setNewCatDescription('');
+    setNewCatImage(null);
+    setAddCategoryError('');
+    setAddCategorySuccess('');
+  };
+
+  const handleCreateCategory = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setAddingCategory(true);
+    setAddCategoryError('');
+    setAddCategorySuccess('');
+    try {
+      let imageUrl = '';
+      if (newCatImage) {
+        const imageRef = ref(storage, `categories/${Date.now()}_${newCatImage.name}`);
+        await uploadBytes(imageRef, newCatImage);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+      await addDoc(collection(db, 'categories'), {
+        name: newCatName,
+        description: newCatDescription,
+        imageUrl,
+        createdAt: new Date()
+      });
+      // Update local dropdown and select the new category
+      setCategoryOptions((prev) => (prev.includes(newCatName) ? prev : [...prev, newCatName]));
+      setCategory(newCatName);
+      setAddCategorySuccess('Category added');
+      // Close modal shortly after success
+      setTimeout(() => {
+        setShowCategoryModal(false);
+        resetNewCategoryForm();
+      }, 600);
+    } catch (err) {
+      console.error('Failed to add category:', err);
+      setAddCategoryError('Failed to add category.');
+    } finally {
+      setAddingCategory(false);
+    }
+  };
+  
   const handleSuggestLocation = async () => {
     setLocationError('');
-    const next = await suggestNextLocation();
-    setRack(String(next.rack));
-    setShelf(String(next.shelf));
-    setBin(String(next.bin));
-    setLocationHint(`Suggested: ${next.code}`);
+    try {
+      const next = await suggestNextLocation();
+      setRack(String(next.rack));
+      setShelf(String(next.shelf));
+      setBin(String(next.bin));
+      setLocationHint(`Suggested: ${next.code}`);
+    } catch (err) {
+      setLocationError('Failed to suggest location. Please enter manually.');
+    }
   };
 
   const checkAvailability = async () => {
     setLocationError('');
     setLocationHint('');
+    
+    // Skip location validation entirely in edit mode
+    if (isEdit) {
+      setLocationHint('Edit mode - location validation disabled');
+      return;
+    }
+    
     if (!rack || !shelf || !bin) return;
+    
     const code = makeCode(Number(rack), Number(shelf), Number(bin));
     const ref = doc(db, 'locations', code);
     const snap = await getDoc(ref);
@@ -125,75 +309,52 @@ function ProductForm({
 
   const handleOptionChange = (index, field, value) => {
     const newOptions = [...options];
-    newOptions[index] = { ...newOptions[index], [field]: value };
+    
+    // Convert numeric fields to numbers
+    if (['quantity', 'minStock', 'mrp', 'sellingPrice', 'specialPrice'].includes(field)) {
+      newOptions[index] = { ...newOptions[index], [field]: Number(value) || 0 };
+    } else {
+      newOptions[index] = { ...newOptions[index], [field]: value };
+    }
     
     // If quantity is less than minStock, adjust minStock
-    if (field === 'quantity' && newOptions[index].minStock > value) {
-      newOptions[index].minStock = value;
+    if (field === 'quantity' && newOptions[index].minStock > Number(value)) {
+      newOptions[index].minStock = Number(value) || 0;
     }
     
     setOptions(newOptions);
   };
 
+
   const addOption = () => {
-    setOptions([...options, { unit: '', price: '', quantity: 0, minStock: 0 }]);
+    setOptions([...options, { 
+      unit: unitOptions[0], 
+      unitSize: '', 
+      mrp: 0, 
+      sellingPrice: 0, 
+      specialPrice: 0, 
+      quantity: 0, 
+      minStock: 0 
+    }]);
   };
 
   const handleRemoveOption = (idx) => {
     setOptions(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
   };
 
-  // Check if all required fields are filled
-  const checkFormCompletion = useCallback(() => {
-    try {
-      // Temporarily make validation more lenient for debugging
-      const isProductDetailsComplete = name && category && description && images.length > 0;
-      const isPricingComplete = options.length > 0 && options.every(opt => 
-        opt.unit && opt.price && Number(opt.quantity) >= 0 && Number(opt.minStock) >= 0
-      );
-      const isLocationComplete = rack && shelf && bin;
-      
-      // Force complete for testing
-      const forceComplete = true;
-      
-      console.log('Form completion check:', {
-        isProductDetailsComplete,
-        isPricingComplete,
-        isLocationComplete,
-        forceComplete,
-        name, category, description, 
-        imagesLength: images.length,
-        options: options.map(opt => ({
-          unit: opt.unit,
-          price: opt.price,
-          quantity: opt.quantity,
-          minStock: opt.minStock,
-          isValid: opt.unit && opt.price && !isNaN(opt.quantity) && !isNaN(opt.minStock)
-        })),
-        locationHint, rack, shelf, bin
-      });
-      
-      return forceComplete || (isProductDetailsComplete && isPricingComplete && isLocationComplete);
-    } catch (err) {
-      console.error('Error checking form completion:', err);
-      onError('Error validating form: ' + (err.message || 'Unknown error'));
-      return false;
-    }
-  }, [name, category, description, images, options, locationHint, rack, shelf, bin, onError]);
-
-  useEffect(() => {
-    setIsFormComplete(checkFormCompletion());
-  }, [checkFormCompletion]);
-
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!isFormComplete) {
-      if (typeof onError === 'function') {
-        onError('Please complete all sections of the form before submitting');
+    // Only check location availability for new products, not updates
+    if (!isEdit && rack && shelf && bin) {
+      const code = makeCode(Number(rack), Number(shelf), Number(bin));
+      const ref = doc(db, 'locations', code);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        onError('This rack/shelf/bin is already in use. Please choose a different location.');
+        return;
       }
-      return;
     }
 
     // Generate location details
@@ -213,8 +374,6 @@ function ProductForm({
       sellingPrice: Number(option.sellingPrice) || 0,
       specialPrice: Number(option.specialPrice) || 0,
       minStock: Number(option.minStock) || 0,
-      // Include any additional option fields
-      ...option
     }));
 
     // Prepare product data with all fields
@@ -236,9 +395,6 @@ function ProductForm({
       // Tax Information
       gstInclusive: Boolean(gstInclusive),
       gstRate: Number(gstRate) || 0,
-      
-      // UI and Display
-      showOfferBand: Boolean(showOfferBand),
       
       // Timestamps
       createdAt: isEdit && initialData.createdAt ? initialData.createdAt : new Date().toISOString(),
@@ -317,11 +473,12 @@ function ProductForm({
       />
       
       <label>Category</label>
-      <select value={category} onChange={e => setCategory(e.target.value)} required>
+      <select value={category} onChange={handleCategoryChange} required>
         <option value="">Select Category</option>
         {categoryOptions.map((cat, idx) => (
           <option key={idx} value={cat}>{cat}</option>
         ))}
+        <option value="__add__">+ Add new category…</option>
       </select>
       
       <label>Product Images</label>
@@ -341,20 +498,6 @@ function ProductForm({
   const renderPricingSection = () => (
     <div className="form-section">
       <h3>Pricing & Options</h3>
-      
-      <div className="toggle-container">
-        <label>Show Offer Band:</label>
-        <div className="toggle-switch">
-          <input
-            type="checkbox"
-            id="offer-band-toggle"
-            checked={showOfferBand}
-            onChange={(e) => setShowOfferBand(e.target.checked)}
-          />
-          <label htmlFor="offer-band-toggle" className="toggle-slider"></label>
-        </div>
-        <span className="toggle-label">{showOfferBand ? 'Yes' : 'No'}</span>
-      </div>
 
       <label>Product Options</label>
       {options.map((opt, idx) => (
@@ -578,25 +721,23 @@ function ProductForm({
   ); 
   
   const renderFormActions = () => (
-    <div className="form-actions" style={{ marginTop: activeSection === 'stock' ? '24px' : '0' }}>
-      {activeSection === 'stock' && (
-        <div style={{ width: '100%' }}>
-          <button 
-            className={`submit-btn ${!isFormComplete ? 'submit-btn--disabled' : ''}`} 
-            type="button"
-            onClick={handleSubmit}
-            disabled={uploading || !isFormComplete}
-            style={{
-              width: '100%',
-              padding: '12px',
-              fontSize: '16px',
-              marginTop: '16px'
-            }}
-          >
-            {uploading ? 'Processing...' : isEdit ? 'Update Product' : 'Add Product'}
-          </button>
-        </div>
-      )}
+    <div className="form-actions" style={{ marginTop: '24px' }}>
+      <div style={{ width: '100%' }}>
+        <button 
+          className={`submit-btn ${!isFormComplete ? 'submit-btn--disabled' : ''}`} 
+          type="button"
+          onClick={handleSubmit}
+          disabled={uploading}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '16px',
+            marginTop: '16px'
+          }}
+        >
+          {uploading ? 'Processing...' : isEdit ? 'Update Product' : 'Add Product'}
+        </button>
+      </div>
       
       <button 
         type="button" 
@@ -635,6 +776,51 @@ function ProductForm({
         
         {renderFormActions()}
       </form>
+
+      {showCategoryModal && (
+        <div className="modal-overlay" onClick={() => { setShowCategoryModal(false); resetNewCategoryForm(); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Add New Category</h3>
+            <form onSubmit={handleCreateCategory}>
+              <label>Category Name</label>
+              <input
+                type="text"
+                placeholder="Category Name"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                required
+              />
+              <label>Description</label>
+              <textarea
+                placeholder="Category Description"
+                value={newCatDescription}
+                onChange={(e) => setNewCatDescription(e.target.value)}
+                rows={3}
+                required
+              />
+              <label>Category Image</label>
+              <input type="file" accept="image/*" onChange={handleNewCatImageChange} />
+
+              {addCategorySuccess && <div className="success-message">{addCategorySuccess}</div>}
+              {addCategoryError && <div className="error-message">{addCategoryError}</div>}
+
+              <div className="form-actions" style={{ marginTop: 0 }}>
+                <button className={`submit-btn ${addingCategory ? 'submit-btn--disabled' : ''}`} type="submit" disabled={addingCategory}>
+                  {addingCategory ? 'Processing…' : 'Add Category'}
+                </button>
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => { setShowCategoryModal(false); resetNewCategoryForm(); }}
+                  disabled={addingCategory}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       
       <style jsx>{`
         * {
@@ -1009,6 +1195,30 @@ function ProductForm({
         .submit-btn:disabled {
           background: #ccc;
           cursor: not-allowed;
+        }
+
+        /* Modal */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 16px;
+        }
+
+        .modal {
+          width: 100%;
+          max-width: 520px;
+          background: #fff;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+          padding: 20px;
         }
         
         .cancel-btn {

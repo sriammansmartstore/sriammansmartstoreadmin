@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { db, storage } from '../firebase';
-import { collection, addDoc, getDocs, orderBy, query, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, orderBy, query, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { reserveLocation, annotateLocation } from '../utils/locations';
+import { reserveLocation, annotateLocation, releaseLocation } from '../utils/locations';
 import ProductForm from '../components/ProductForm';
 import TopNavBar from '../components/TopNavBar';
 import BackButton from '../components/BackButton';
 
-function AddProduct() {
+function AddProduct({ editMode = false }) {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [initialProduct, setInitialProduct] = useState(null);
   const navigate = useNavigate();
+  const { category, id: productId } = useParams();
+
+  // Fetch product data if in edit mode
+  useEffect(() => {
+    if (editMode && category && productId) {
+      const fetchProduct = async () => {
+        try {
+          const productRef = doc(db, 'products', category, 'items', productId);
+          const productDoc = await getDoc(productRef);
+          
+          if (productDoc.exists()) {
+            setInitialProduct({
+              ...productDoc.data(),
+              id: productDoc.id
+            });
+          } else {
+            setError('Product not found');
+            setTimeout(() => navigate('/products/manage'), 1500);
+          }
+        } catch (err) {
+          console.error('Error fetching product:', err);
+          setError('Failed to load product data');
+        }
+      };
+      
+      fetchProduct();
+    }
+  }, [editMode, category, productId, navigate]);
 
   // Get the next product number by checking the last product in the category
   const getNextProductNumber = async (category) => {
@@ -30,6 +59,7 @@ function AddProduct() {
     setUploading(true);
     setError('');
     setSuccess('');
+    
     try {
       const {
         name,
@@ -109,21 +139,53 @@ function AddProduct() {
         } : {})
       };
 
-      // Add to 'products/{category}/items' subcollection
-      const newRef = await addDoc(collection(db, 'products', category, 'items'), productDoc);
-
-      // Annotate location with product id reference for easier lookup
-      if (locationCode && rack && shelf && bin) {
-        await annotateLocation(locationCode, {
-          productId: newRef.id,
-          productDocPath: `products/${category}/items/${newRef.id}`,
-          category,
-          productNumber
+      if (editMode && initialProduct) {
+        // Update existing product
+        const productRef = doc(db, 'products', category, 'items', productId);
+        
+        // Release old location if changed
+        if (initialProduct.location?.code && 
+            (initialProduct.location.code !== locationCode || 
+             initialProduct.location.rack !== rack || 
+             initialProduct.location.shelf !== shelf || 
+             initialProduct.location.bin !== bin)) {
+          await releaseLocation(initialProduct.location.code);
+        }
+        
+        // Reserve new location if provided
+        if (locationCode && rack && shelf && bin) {
+          await annotateLocation(locationCode, {
+            productId: productId,
+            productDocPath: `products/${category}/items/${productId}`,
+            category,
+            productNumber: initialProduct.productNumber || productNumber
+          });
+        }
+        
+        await updateDoc(productRef, {
+          ...productDoc,
+          updatedAt: new Date().toISOString()
         });
-      }
+        
+        setSuccess('Product updated successfully!');
+      } else {
+        // Add new product
+        const newRef = await addDoc(collection(db, 'products', category, 'items'), productDoc);
 
-      setSuccess('Product added successfully!');
-      setTimeout(() => navigate('/products'), 1200);
+        // Annotate location with product id reference for easier lookup
+        if (locationCode && rack && shelf && bin) {
+          await annotateLocation(locationCode, {
+            productId: newRef.id,
+            productDocPath: `products/${category}/items/${newRef.id}`,
+            category,
+            productNumber
+          });
+        }
+        
+        setSuccess('Product added successfully!');
+      }
+      
+      setTimeout(() => navigate('/products/manage'), 1200);
     } catch (err) {
       console.error('Add product error:', err);
       setError('Failed to add product. ' + (err && err.message ? err.message : ''));
@@ -146,8 +208,9 @@ function AddProduct() {
             uploading={uploading}
             success={success}
             error={error}
-            onCancel={() => navigate('/products')}
-            isEdit={false}
+            onCancel={() => navigate('/products/manage')}
+            isEdit={editMode}
+            initialData={initialProduct}
           />
         </div>
       </div>
